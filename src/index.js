@@ -119,8 +119,54 @@ client.on("interactionCreate", async (interaction) => {
       if (imageUrl) embed.setThumbnail(imageUrl);
 
       const button = new ButtonBuilder()
-        .setCustomId(`bet:${team1}:${team2}`)
+        .setCustomId(`bet:fr:${team1}:${team2}`)
         .setLabel("🎯 Fais ton prono !")
+        .setStyle(ButtonStyle.Primary);
+
+      await interaction.reply({
+        embeds: [embed],
+        components: [new ActionRowBuilder().addComponents(button)],
+      });
+    }
+
+    // /create-match-en
+    if (interaction.isChatInputCommand() && interaction.commandName === "create-match-en") {
+      const team1      = interaction.options.getString("equipe1");
+      const team2      = interaction.options.getString("equipe2");
+      const emoji1     = interaction.options.getString("emoji1");
+      const emoji2     = interaction.options.getString("emoji2");
+      const kickoffStr = interaction.options.getString("kickoff");
+      const imageUrl   = interaction.options.getString("image") || null;
+
+      const kickoffTs = parseKickoff(kickoffStr);
+      if (!kickoffTs) {
+        return interaction.reply({
+          content: "Invalid date format. Use: `2026-06-20 21:00` (Paris time)",
+          ephemeral: true,
+        });
+      }
+
+      createMatch({ team1, team2, emoji1, emoji2, kickoff: kickoffTs });
+      const kickoffDisplay = formatKickoff(kickoffTs);
+
+      const embed = new EmbedBuilder()
+        .setTitle(`${emoji1} ${team1}  vs  ${team2} ${emoji2}`)
+        .setDescription(
+          `**World Cup 2026**\n\n` +
+          `Who will win this match? What will the score be?\n` +
+          `Click the button to place your prediction!\n\n` +
+          `> 🎯 **+5 pts** - correct result (or draw)\n` +
+          `> 💎 **+10 pts** - exact score bonus\n\n` +
+          `⏰ **Kick-off:** ${kickoffDisplay}\n` +
+          `🔒 **Predictions close at kick-off**`
+        )
+        .setColor(0x004170);
+
+      if (imageUrl) embed.setThumbnail(imageUrl);
+
+      const button = new ButtonBuilder()
+        .setCustomId(`bet:en:${team1}:${team2}`)
+        .setLabel("🎯 Make your prediction!")
         .setStyle(ButtonStyle.Primary);
 
       await interaction.reply({
@@ -208,9 +254,11 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.reply({ content: "Toutes les donnees ont ete reinitialisees.", ephemeral: true });
     }
 
-    // Bouton
-    if (interaction.isButton() && interaction.customId.startsWith("bet:")) {
-      const [, team1, team2] = interaction.customId.split(":");
+    // Bouton FR
+    if (interaction.isButton() && interaction.customId.startsWith("bet:fr:")) {
+      const parts = interaction.customId.split(":");
+      const team1 = parts[2];
+      const team2 = parts[3];
 
       if (isBettingClosed(team1, team2)) {
         const meta = getMatchMeta(team1, team2);
@@ -235,7 +283,7 @@ client.on("interactionCreate", async (interaction) => {
 
       const modalTitle = `${e1} ${team1} vs ${team2} ${e2}`.slice(0, 45);
       const modal = new ModalBuilder()
-        .setCustomId(`modal:${team1}:${team2}`)
+        .setCustomId(`modal:fr:${team1}:${team2}`)
         .setTitle(modalTitle);
 
       modal.addComponents(
@@ -262,12 +310,70 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.showModal(modal);
     }
 
-    // Soumission modale
+    // Bouton EN
+    if (interaction.isButton() && interaction.customId.startsWith("bet:en:")) {
+      const parts = interaction.customId.split(":");
+      const team1 = parts[2];
+      const team2 = parts[3];
+
+      if (isBettingClosed(team1, team2)) {
+        const meta = getMatchMeta(team1, team2);
+        const e1 = meta?.emoji1 || "";
+        const e2 = meta?.emoji2 || "";
+        return interaction.reply({
+          content: `🔒 Predictions for **${e1} ${team1} vs ${team2} ${e2}** are closed - the match has started!`,
+          ephemeral: true,
+        });
+      }
+
+      if (hasBet(team1, team2, interaction.user.id)) {
+        return interaction.reply({
+          content: "You already placed a prediction on this match. Only one prediction allowed!",
+          ephemeral: true,
+        });
+      }
+
+      const meta = getMatchMeta(team1, team2);
+      const e1 = meta?.emoji1 || "";
+      const e2 = meta?.emoji2 || "";
+
+      const modalTitle = `${e1} ${team1} vs ${team2} ${e2}`.slice(0, 45);
+      const modal = new ModalBuilder()
+        .setCustomId(`modal:en:${team1}:${team2}`)
+        .setTitle(modalTitle);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("goals1")
+            .setLabel(`Goals ${e1} ${team1}`)
+            .setPlaceholder("e.g. 2")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(2)
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("goals2")
+            .setLabel(`Goals ${e2} ${team2}`)
+            .setPlaceholder("e.g. 1")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(2)
+        )
+      );
+
+      await interaction.showModal(modal);
+    }
+
+    // Soumission modale FR
     if (
       interaction.type === InteractionType.ModalSubmit &&
-      interaction.customId.startsWith("modal:")
+      interaction.customId.startsWith("modal:fr:")
     ) {
-      const [, team1, team2] = interaction.customId.split(":");
+      const parts = interaction.customId.split(":");
+      const team1 = parts[2];
+      const team2 = parts[3];
 
       if (isBettingClosed(team1, team2)) {
         return interaction.reply({
@@ -313,6 +419,64 @@ client.on("interactionCreate", async (interaction) => {
           { name: "Score predit", value: `**${e1} ${team1} ${goals1} - ${goals2} ${team2} ${e2}**`, inline: true },
           { name: "Resultat predit", value: winner, inline: true },
           { name: "Points en jeu", value: `🎯 **+5 pts** si bon resultat\n💎 **+10 pts** si score exact` }
+        );
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    // Soumission modale EN
+    if (
+      interaction.type === InteractionType.ModalSubmit &&
+      interaction.customId.startsWith("modal:en:")
+    ) {
+      const parts = interaction.customId.split(":");
+      const team1 = parts[2];
+      const team2 = parts[3];
+
+      if (isBettingClosed(team1, team2)) {
+        return interaction.reply({
+          content: "🔒 Predictions are now closed for this match - kick-off has been given!",
+          ephemeral: true,
+        });
+      }
+
+      const goals1Raw = interaction.fields.getTextInputValue("goals1").trim();
+      const goals2Raw = interaction.fields.getTextInputValue("goals2").trim();
+
+      if (!/^\d{1,2}$/.test(goals1Raw) || !/^\d{1,2}$/.test(goals2Raw)) {
+        return interaction.reply({
+          content: "Scores must be whole numbers (e.g. `2` and `1`).",
+          ephemeral: true,
+        });
+      }
+
+      const goals1 = parseInt(goals1Raw);
+      const goals2 = parseInt(goals2Raw);
+      const meta = getMatchMeta(team1, team2);
+      const e1 = meta?.emoji1 || "";
+      const e2 = meta?.emoji2 || "";
+
+      try {
+        appendBet({
+          team1, team2,
+          username: interaction.user.username,
+          userId: interaction.user.id,
+          goals1, goals2,
+        });
+      } catch (err) {
+        return interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
+      }
+
+      const winner = goals1 > goals2 ? `${e1} ${team1}` : goals1 < goals2 ? `${e2} ${team2}` : "Draw 🤝";
+
+      const embed = new EmbedBuilder()
+        .setTitle("✅ Prediction saved!")
+        .setColor(0x22c55e)
+        .addFields(
+          { name: "Match", value: `**${e1} ${team1}** vs **${team2} ${e2}**` },
+          { name: "Predicted score", value: `**${e1} ${team1} ${goals1} - ${goals2} ${team2} ${e2}**`, inline: true },
+          { name: "Predicted result", value: winner, inline: true },
+          { name: "Points at stake", value: `🎯 **+5 pts** correct result\n💎 **+10 pts** exact score` }
         );
 
       await interaction.reply({ embeds: [embed], ephemeral: true });

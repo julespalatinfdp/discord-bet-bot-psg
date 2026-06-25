@@ -4,13 +4,25 @@ require("dotenv").config();
 const commands = [
   new SlashCommandBuilder()
     .setName("create-match")
-    .setDescription("[Admin] Creer un match et poster l'embed de pronos")
+    .setDescription("[Admin] Creer un match - embed en francais")
     .addStringOption((o) => o.setName("equipe1").setDescription("Nom equipe 1").setRequired(true))
     .addStringOption((o) => o.setName("equipe2").setDescription("Nom equipe 2").setRequired(true))
     .addStringOption((o) => o.setName("emoji1").setDescription("Emoji equipe 1").setRequired(true))
     .addStringOption((o) => o.setName("emoji2").setDescription("Emoji equipe 2").setRequired(true))
     .addStringOption((o) => o.setName("kickoff").setDescription("Heure coup d'envoi : 2026-06-20 21:00").setRequired(true))
     .addStringOption((o) => o.setName("image").setDescription("URL image thumbnail (optionnel)").setRequired(false))
+    .setDefaultMemberPermissions(0x8)
+    .toJSON(),
+
+  new SlashCommandBuilder()
+    .setName("create-match-en")
+    .setDescription("[Admin] Create a match - English embed")
+    .addStringOption((o) => o.setName("equipe1").setDescription("Team 1 name").setRequired(true))
+    .addStringOption((o) => o.setName("equipe2").setDescription("Team 2 name").setRequired(true))
+    .addStringOption((o) => o.setName("emoji1").setDescription("Team 1 emoji").setRequired(true))
+    .addStringOption((o) => o.setName("emoji2").setDescription("Team 2 emoji").setRequired(true))
+    .addStringOption((o) => o.setName("kickoff").setDescription("Kick-off time: 2026-06-20 21:00").setRequired(true))
+    .addStringOption((o) => o.setName("image").setDescription("Thumbnail image URL (optional)").setRequired(false))
     .setDefaultMemberPermissions(0x8)
     .toJSON(),
 
@@ -56,7 +68,7 @@ const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
       ),
       { body: commands }
     );
-    console.log("5 commandes deployees : /create-match /set-result /classement /close-match /reset");
+    console.log("6 commandes deployees : /create-match /create-match-en /set-result /classement /close-match /reset");
   } catch (err) {
     console.error(err);
   }
